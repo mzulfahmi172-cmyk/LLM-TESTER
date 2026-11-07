@@ -1,0 +1,10 @@
+@tailwind base; @tailwind components; @tailwind utilities;
+:root{--paper:#fbfcfd;--panel:#f1f4f7;--ink:#17202a;--muted:#5b6775;--line:#dde3ea;
+  --steel:#2f5d8a;--steel-soft:#e3ecf5;--mark:#f6e7a8;--danger:#b42318;--ok:#1f7a4d;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--paper:#12171d;--panel:#1a2129;--ink:#e6ebf0;--muted:#9aa6b2;
+  --line:#2b3540;--steel:#7fb0e0;--steel-soft:#1f3247;--mark:#5c4f1c;--danger:#f97066;--ok:#4ec38a;color-scheme:dark}}
+html,body{background:var(--paper);color:var(--ink)}
+:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+.cite{background:var(--mark);color:var(--ink);border-radius:3px;padding:0 4px;font-family:'IBM Plex Sans',sans-serif;
+  font-size:12px;font-weight:600;cursor:pointer;vertical-align:1px;border:none;margin:0 2px}
+.cite:hover,.cite.active{outline:2px solid var(--steel)}
