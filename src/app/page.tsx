@@ -25,7 +25,7 @@ export default function ChatPage() {
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
 
   async function login() {
-    await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + "/api/auth/callback" } });
+    await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
   }
 
   async function send() {
