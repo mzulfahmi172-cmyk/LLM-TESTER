@@ -3,7 +3,7 @@ import { embedQuery } from "./ai";
 import type { Citation } from "@/types";
 
 export async function searchChunks(
-  query: string, topK = 20
+  query: string, topK = 40
 ): Promise<{ chunks: any[]; citations: Citation[] }> {
   const db = adminClient();
   
@@ -31,7 +31,7 @@ export async function searchChunks(
       .from("chunks")
       .select("*, documents!inner(id, name, mime_type, web_view_link)")
       .ilike("content", `%${keywords[0]}%`)
-      .limit(topK);
+      .limit(40);
     keywordHits = data || [];
   }
 
