@@ -1,4 +1,3 @@
-/** Sinkronisasi Google Shared Drive → Supabase. */
 import { adminClient } from "./supabase-server";
 import { scanAllFiles, buildFolderPaths, getStartPageToken, listChanges, type FileMeta } from "./drive";
 import { isSupported, unsupportedReason } from "./extract";
@@ -8,9 +7,7 @@ export async function fullSync(): Promise<{ discovered: number; queued: number }
   await db.from("sync_state").update({ status: "scanning", error: null }).eq("id", 1);
 
   try {
-    // Ambil start token SEBELUM scan (agar perubahan selama scan tidak hilang)
     const token = await getStartPageToken();
-
     const files = await scanAllFiles();
     const paths = buildFolderPaths(files);
     const nonFolders = files.filter(f => f.mimeType !== "application/vnd.google-apps.folder");
@@ -21,19 +18,26 @@ export async function fullSync(): Promise<{ discovered: number; queued: number }
       const reason = !isSupported(f.mimeType) ? (unsupportedReason(f.mimeType) || "Tidak didukung") : null;
 
       const { data: existing } = await db.from("documents")
-        .select("id, modified_time, index_status")
+        .select("id, modified_time, index_status, chunk_count")
         .eq("drive_file_id", f.id).single();
 
       if (existing) {
-        // Update metadata
+        const needsReindex =
+          !reason && (
+            existing.index_status === "pending" ||
+            existing.index_status === "failed" ||
+            existing.modified_time !== f.modifiedTime ||
+            (existing.index_status === "indexed" && (existing.chunk_count || 0) === 0)
+          );
+
         await db.from("documents").update({
           name: f.name, mime_type: f.mimeType, folder_path: folderPath,
           modified_time: f.modifiedTime, size_bytes: f.size ? parseInt(f.size) : null,
           web_view_link: f.webViewLink,
           ...(reason ? { index_status: "unsupported", error: reason } : {}),
-          ...(!reason && existing.modified_time !== f.modifiedTime ? { index_status: "pending" } : {}),
+          ...(needsReindex ? { index_status: "pending", error: null } : {}),
         }).eq("id", existing.id);
-        if (!reason && existing.modified_time !== f.modifiedTime) queued++;
+        if (needsReindex) queued++;
       } else {
         await db.from("documents").insert({
           drive_file_id: f.id, name: f.name, mime_type: f.mimeType, folder_path: folderPath,
@@ -46,7 +50,7 @@ export async function fullSync(): Promise<{ discovered: number; queued: number }
       }
     }
 
-    // Tandai file yang tidak lagi ada di Drive
+    // Hapus dokumen yang tidak ada lagi di Drive
     const driveIds = new Set(nonFolders.map(f => f.id));
     const { data: allDocs } = await db.from("documents").select("id, drive_file_id");
     for (const doc of (allDocs || [])) {
@@ -92,7 +96,6 @@ export async function incrementalSync(): Promise<{ changes: number }> {
           name: f.name, modified_time: f.modifiedTime, index_status: "pending",
         }).eq("id", existing.id);
       }
-      // File baru akan ditangkap oleh full sync berikutnya
     }
   }
 
