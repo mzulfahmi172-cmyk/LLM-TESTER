@@ -2,23 +2,31 @@ import { adminClient } from "./supabase-server";
 import { embedQuery } from "./ai";
 import type { Citation } from "@/types";
 
-/** Hybrid retrieval: semantic (pgvector) + keyword (ILIKE). */
 export async function searchChunks(
   query: string, topK = 8
 ): Promise<{ chunks: any[]; citations: Citation[] }> {
   const db = adminClient();
-  const qvec = await embedQuery(query);
+  
+  let semantic: any[] = [];
+  
+  try {
+    const qvec = await embedQuery(query);
+    const { data, error } = await db.rpc("match_chunks", {
+      query_embedding: `[${qvec.join(",")}]`, match_count: topK * 3,
+    });
+    if (error) {
+      console.error("[retrieval] match_chunks error:", JSON.stringify(error));
+    } else {
+      semantic = data || [];
+    }
+  } catch (e: any) {
+    console.error("[retrieval] Embedding/search error:", e.message);
+  }
 
-  // Semantic search via pgvector
-  const { data: semantic } = await db.rpc("match_chunks", {
-    query_embedding: qvec, match_count: topK * 3,
-  });
-
-  // Keyword search (fallback untuk kode, nomor, nama spesifik)
-  const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 5);
+  // Keyword fallback
+  const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 3);
   let keywordHits: any[] = [];
   if (keywords.length) {
-    const pattern = keywords.map(k => `%${k}%`).join("");
     const { data } = await db
       .from("chunks")
       .select("*, documents!inner(id, name, mime_type, web_view_link)")
@@ -27,15 +35,17 @@ export async function searchChunks(
     keywordHits = data || [];
   }
 
-  // Merge dan deduplikasi
+  // Merge
   const seen = new Set<number>();
   const merged: any[] = [];
-  for (const row of [...(semantic || []), ...keywordHits]) {
+  for (const row of [...semantic, ...keywordHits]) {
     const id = row.id ?? row.chunk_id;
     if (!seen.has(id)) { seen.add(id); merged.push(row); }
   }
 
   const top = merged.slice(0, topK);
+  console.log(`[retrieval] Found ${semantic.length} semantic + ${keywordHits.length} keyword = ${top.length} results`);
+  
   const citations: Citation[] = top.map((r, i) => ({
     id: `S${i + 1}`,
     document_id: r.document_id,
