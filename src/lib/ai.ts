@@ -11,7 +11,6 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
         content: { parts: [{ text: t }], role: "user" },
       })),
     });
-    // Potong ke 768 dimensi (Matryoshka embedding mendukung ini)
     out.push(...res.embeddings.map(e => e.values.slice(0, 768)));
   }
   return out;
@@ -31,7 +30,10 @@ export async function* streamAnswer(
   sources: { id: string; name: string; location: string; content: string }[],
   history: { role: string; content: string }[] = [],
 ): AsyncGenerator<string> {
-  const model = genAI().getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI().getGenerativeModel({
+    model: "gemini-2.5-flash",
+    systemInstruction: { role: "user", parts: [{ text: SYS }] },
+  });
   const block = sources.map((s, i) =>
     `<source id="S${i+1}">\nDokumen: ${s.name}\nLokasi: ${s.location}\nIsi:\n${s.content}\n</source>`
   ).join("\n\n");
@@ -39,7 +41,7 @@ export async function* streamAnswer(
     role: h.role === "user" ? "user" as const : "model" as const,
     parts: [{ text: h.content }],
   }));
-  const chat = model.startChat({ history: hist, systemInstruction: SYS });
+  const chat = model.startChat({ history: hist });
   const res = await chat.sendMessageStream(`${block}\n\nPertanyaan: ${question}`);
   for await (const chunk of res.stream) { const t = chunk.text(); if (t) yield t; }
 }
