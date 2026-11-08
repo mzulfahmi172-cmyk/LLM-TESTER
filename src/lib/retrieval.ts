@@ -3,7 +3,7 @@ import { embedQuery } from "./ai";
 import type { Citation } from "@/types";
 
 export async function searchChunks(
-  query: string, topK = 8
+  query: string, topK = 20
 ): Promise<{ chunks: any[]; citations: Citation[] }> {
   const db = adminClient();
   
@@ -12,7 +12,7 @@ export async function searchChunks(
   try {
     const qvec = await embedQuery(query);
     const { data, error } = await db.rpc("match_chunks", {
-      query_embedding: `[${qvec.join(",")}]`, match_count: topK * 3,
+      query_embedding: `[${qvec.join(",")}]`, match_count: 50,
     });
     if (error) {
       console.error("[retrieval] match_chunks error:", JSON.stringify(error));
