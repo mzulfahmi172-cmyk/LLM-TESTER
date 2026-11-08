@@ -17,23 +17,21 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 }
 export async function embedQuery(text: string) { return (await embedTexts([text]))[0]; }
 
-const SYS = `Anda adalah asisten dokumen internal perusahaan. Aturan wajib:
-1. Jawab HANYA berdasarkan isi <source>. Jangan memakai pengetahuan umum untuk fakta perusahaan.
-2. Setiap kalimat faktual WAJIB diberi sitasi [S#] sesuai ID sumber.
-3. Jangan membuat nomor halaman, sheet, slide, atau kutipan palsu.
-4. Jika informasi tidak ada: "Informasi tersebut tidak ditemukan dalam dokumen yang tersedia."
-5. Jika sumber bertentangan, tampilkan perbedaannya.
-6. Jawab dalam bahasa pertanyaan (default Bahasa Indonesia formal).`;
+const INSTRUKSI = `INSTRUKSI SISTEM (wajib diikuti):
+1. Jawab HANYA berdasarkan isi <source> yang diberikan di bawah.
+2. Jangan memakai pengetahuan umum untuk fakta perusahaan.
+3. Setiap kalimat faktual WAJIB diberi sitasi [S#] sesuai ID sumber.
+4. Jangan membuat nomor halaman, sheet, slide, atau kutipan palsu.
+5. Jika informasi tidak ada, katakan: "Informasi tersebut tidak ditemukan dalam dokumen yang tersedia."
+6. Jika sumber bertentangan, tampilkan perbedaannya.
+7. Jawab dalam bahasa pertanyaan (default Bahasa Indonesia formal).`;
 
 export async function* streamAnswer(
   question: string,
   sources: { id: string; name: string; location: string; content: string }[],
   history: { role: string; content: string }[] = [],
 ): AsyncGenerator<string> {
-  const model = genAI().getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: { role: "user", parts: [{ text: SYS }] },
-  });
+  const model = genAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const block = sources.map((s, i) =>
     `<source id="S${i+1}">\nDokumen: ${s.name}\nLokasi: ${s.location}\nIsi:\n${s.content}\n</source>`
   ).join("\n\n");
@@ -42,6 +40,7 @@ export async function* streamAnswer(
     parts: [{ text: h.content }],
   }));
   const chat = model.startChat({ history: hist });
-  const res = await chat.sendMessageStream(`${block}\n\nPertanyaan: ${question}`);
+  const prompt = `${INSTRUKSI}\n\n${block}\n\nPertanyaan: ${question}`;
+  const res = await chat.sendMessageStream(prompt);
   for await (const chunk of res.stream) { const t = chunk.text(); if (t) yield t; }
 }
