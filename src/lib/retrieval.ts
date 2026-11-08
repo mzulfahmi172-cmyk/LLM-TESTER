@@ -17,11 +17,44 @@ export async function searchChunks(
     if (error) {
       console.error("[retrieval] match_chunks error:", JSON.stringify(error));
     } else {
-      // Filter: hanya ambil yang relevansinya > 0.3
-      semantic = (data || []).filter((r: any) => r.similarity > 0.3);
+      semantic = data || [];
     }
   } catch (e: any) {
     console.error("[retrieval] Embedding/search error:", e.message);
+  }
+
+  // Jika mayoritas hasil dari satu dokumen, ambil SEMUA chunk dari dokumen itu
+  if (semantic.length > 0) {
+    const docCounts = new Map<string, number>();
+    for (const r of semantic) {
+      const did = r.document_id;
+      docCounts.set(did, (docCounts.get(did) || 0) + 1);
+    }
+    
+    // Cari dokumen dominan (>50% hasil)
+    for (const [docId, count] of docCounts) {
+      if (count > semantic.length * 0.5) {
+        // Ambil semua chunk dari dokumen ini
+        const { data: allChunks } = await db
+          .from("chunks")
+          .select("*, documents!inner(id, name, mime_type, web_view_link)")
+          .eq("document_id", docId)
+          .order("chunk_index");
+        
+        if (allChunks && allChunks.length > 0) {
+          console.log(`[retrieval] Dominant doc ${docId}: fetched all ${allChunks.length} chunks`);
+          // Format agar sama dengan output match_chunks
+          semantic = allChunks.map(c => ({
+            chunk_id: c.id, document_id: c.document_id, content: c.content,
+            chunk_index: c.chunk_index, page_number: c.page_number,
+            sheet_name: c.sheet_name, slide_number: c.slide_number,
+            similarity: 1, doc_name: c.documents?.name,
+            doc_mime: c.documents?.mime_type, doc_link: c.documents?.web_view_link,
+          }));
+        }
+        break;
+      }
+    }
   }
 
   // Keyword fallback
@@ -45,7 +78,7 @@ export async function searchChunks(
   }
 
   const top = merged.slice(0, topK);
-  console.log(`[retrieval] Found ${semantic.length} relevant (>0.3) + ${keywordHits.length} keyword = ${top.length} results`);
+  console.log(`[retrieval] Total ${top.length} results`);
   
   const citations: Citation[] = top.map((r, i) => ({
     id: `S${i + 1}`,
