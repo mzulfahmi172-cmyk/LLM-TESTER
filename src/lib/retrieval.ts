@@ -17,7 +17,8 @@ export async function searchChunks(
     if (error) {
       console.error("[retrieval] match_chunks error:", JSON.stringify(error));
     } else {
-      semantic = data || [];
+      // Filter: hanya ambil yang relevansinya > 0.3
+      semantic = (data || []).filter((r: any) => r.similarity > 0.3);
     }
   } catch (e: any) {
     console.error("[retrieval] Embedding/search error:", e.message);
@@ -26,12 +27,12 @@ export async function searchChunks(
   // Keyword fallback
   const keywords = query.split(/\s+/).filter(w => w.length > 2).slice(0, 3);
   let keywordHits: any[] = [];
-  if (keywords.length) {
+  if (keywords.length && semantic.length < 3) {
     const { data } = await db
       .from("chunks")
       .select("*, documents!inner(id, name, mime_type, web_view_link)")
       .ilike("content", `%${keywords[0]}%`)
-      .limit(40);
+      .limit(topK);
     keywordHits = data || [];
   }
 
@@ -44,7 +45,7 @@ export async function searchChunks(
   }
 
   const top = merged.slice(0, topK);
-  console.log(`[retrieval] Found ${semantic.length} semantic + ${keywordHits.length} keyword = ${top.length} results`);
+  console.log(`[retrieval] Found ${semantic.length} relevant (>0.3) + ${keywordHits.length} keyword = ${top.length} results`);
   
   const citations: Citation[] = top.map((r, i) => ({
     id: `S${i + 1}`,
