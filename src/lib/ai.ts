@@ -9,10 +9,10 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
     const res = await model.batchEmbedContents({
       requests: batch.map(t => ({
         content: { parts: [{ text: t }], role: "user" },
-        outputDimensionality: 768,
       })),
     });
-    out.push(...res.embeddings.map(e => e.values));
+    // Potong ke 768 dimensi (Matryoshka embedding mendukung ini)
+    out.push(...res.embeddings.map(e => e.values.slice(0, 768)));
   }
   return out;
 }
