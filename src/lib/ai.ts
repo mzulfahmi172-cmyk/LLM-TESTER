@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = () => new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function embedTexts(texts: string[]): Promise<number[][]> {
-  const model = genAI().getGenerativeModel({ model: "text-embedding-004" });
+  const model = genAI().getGenerativeModel({ model: "gemini-embedding-001" });
   const out: number[][] = [];
   for (let i = 0; i < texts.length; i += 100) {
     const batch = texts.slice(i, i + 100);
@@ -28,7 +28,7 @@ export async function* streamAnswer(
   sources: { id: string; name: string; location: string; content: string }[],
   history: { role: string; content: string }[] = [],
 ): AsyncGenerator<string> {
-  const model = genAI().getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI().getGenerativeModel({ model: "gemini-2.5-flash" });
   const block = sources.map((s, i) =>
     `<source id="S${i+1}">\nDokumen: ${s.name}\nLokasi: ${s.location}\nIsi:\n${s.content}\n</source>`
   ).join("\n\n");
