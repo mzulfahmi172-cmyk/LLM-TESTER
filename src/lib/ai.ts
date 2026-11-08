@@ -31,7 +31,7 @@ export async function* streamAnswer(
   sources: { id: string; name: string; location: string; content: string }[],
   history: { role: string; content: string }[] = [],
 ): AsyncGenerator<string> {
-  const model = genAI().getGenerativeModel({ model: "gemini-3.8-flash" });
+  const model = genAI().getGenerativeModel({ model: "gemini-3.5-flash" });
   const block = sources.map((s, i) =>
     `<source id="S${i+1}">\nDokumen: ${s.name}\nLokasi: ${s.location}\nIsi:\n${s.content}\n</source>`
   ).join("\n\n");
