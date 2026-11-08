@@ -7,7 +7,10 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
   for (let i = 0; i < texts.length; i += 100) {
     const batch = texts.slice(i, i + 100);
     const res = await model.batchEmbedContents({
-      requests: batch.map(t => ({ content: { parts: [{ text: t }], role: "user" } })),
+      requests: batch.map(t => ({
+        content: { parts: [{ text: t }], role: "user" },
+        outputDimensionality: 768,
+      })),
     });
     out.push(...res.embeddings.map(e => e.values));
   }
